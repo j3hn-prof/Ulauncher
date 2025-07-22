@@ -8,25 +8,34 @@
         <div class="ext-name">{{ extension.name }}</div>
         <div class="authors">by {{ extension.authors }}</div>
         <div class="repo" v-if="extension.url">
-          <div v-if="extension.commit_hash"><i class="fa fa-code-fork fa-fw"></i><span class="text-monospace">{{ extension.commit_hash.slice(0, 7) }}</span></div> 
-          <div v-if="extension.commit_hash"><i class="fa fa-calendar fa-fw"></i>{{ extension.updated_at.slice(0, 10) }}</div> 
-          <div>
-            <a class="text-muted" href @click.prevent="openUrl(extension.url)">
+          <div v-if="extension.commit_hash"><i class="fa fa-code-fork fa-fw"></i><span class="text-monospace">{{ extension.commit_hash.slice(0, 7) }}</span></div>
+          <div v-if="extension.commit_hash"><i class="fa fa-calendar fa-fw"></i>{{ extension.updated_at.slice(0, 10) }}</div>
+          <div v-if="extension.browser_url">
+            <a class="text-muted" href @click.prevent="openUrl(extension.browser_url)" :title="extension.browser_url">
               <i class="fa fa-external-link"></i> Open repository
             </a>
           </div>
+          <div v-if="!extension.browser_url">
+            <i class="fa fa-copy"></i>
+            <a class="text-muted" href @click.prevent
+             v-clipboard:copy="extension.url"
+             :title="'Click to copy: ' + extension.url">Copy url</a>
+          </div>
         </div>
         <div class="notes">
-          <span v-if="extension.is_manageable">user installed,</span>
-          <span v-if="!extension.is_manageable">externally managed,</span>
+          <span v-if="extension.is_manageable">User installed</span>
+          <span v-if="!extension.is_manageable">Externally managed,</span>
           <a class="text-muted" href @click.prevent
              v-clipboard:copy="extension.path"
-             v-b-tooltip.hover="'click to copy:\n\n' + extension.path">see path</a>
+             :title="extension.path"><i class="fa fa-copy"></i> copy path</a>
         </div>
         <div class="notes" v-if="extension.duplicate_paths.length > 0">
-          duplicates found,
+          Duplicates found,
           <a class="text-muted" href @click.prevent
-             v-b-tooltip.hover="extension.duplicate_paths.map((p) => `- ${p}`).join('\n')">see paths</a>
+             :title="extension.duplicate_paths.map((p) => `- ${p}`).join('\n')">
+             <i class="fa fa-copy"></i>
+             copy paths
+          </a>
         </div>
       </div>
       <div class="saved-notif">
@@ -34,14 +43,18 @@
       </div>
       <div>
         <b-button-group>
-          <b-button @click="save" v-if="canSave && !extension.error_type" title="Save"><i class="fa fa-save"></i></b-button>
+          <b-button @click="save" v-if="canSave && !extension.error_type" title="Save preferences"><i class="fa fa-check"></i></b-button>
           <b-button @click="checkUpdates" v-if="extension.url" title="Check updates"><i class="fa fa-refresh"></i></b-button>
           <b-button @click="openRemoveModal" v-if="isManageable" title="Remove"><i class="fa fa-trash"></i></b-button>
+          <b-button
+            @click="setIsEnabled(!extension.is_enabled || !!extension.error_type)"
+            :variant="(extension.is_enabled && !extension.error_type) ? 'success' : 'outline-secondary'"
+            :disabled="!['', 'Terminated'].includes(extension.error_type)"
+            :title="(extension.is_enabled && !extension.error_type) ? 'Disable extension' : 'Enable extension'"
+          >
+            {{ (extension.is_enabled && !extension.error_type) ? 'ON' : 'OFF' }}
+          </b-button>
         </b-button-group>
-        <label class="toggle" :title="(extension.is_enabled && !extension.error_type) ? 'Disable' : 'Enable'">
-          <input @click="setIsEnabled(!extension.is_enabled || !!extension.error_type)" type="checkbox" :checked="extension.is_enabled && !extension.error_type" :disabled="!['', 'Terminated'].includes(extension.error_type)">
-          <span class="slider round"></span>
-        </label>
       </div>
     </div>
 
@@ -52,7 +65,7 @@
 
     <div class="error-wrapper" v-if="extension.error_type && extension.is_enabled">
       <ext-runtime-error
-        :extUrl="extension.url"
+        :extUrl="extension.browser_url"
         :errorMessage="extension.error_message"
         :errorType="extension.error_type"
       />
@@ -130,7 +143,7 @@
 
       <ext-install-error
         v-if="updateError"
-        :extUrl="extension.url"
+        :extUrl="extension.browser_url"
         :errorMessage="updateError.message"
         :errorType="updateError.type"
       />
@@ -321,6 +334,8 @@ export default {
   font-size: 0.9em;
   opacity: 0.8;
   display: flex;
+  position: relative;
+  left: -4px;
 }
 .header-info .ext-info .repo > div {
   margin-right: 8px;
@@ -368,59 +383,5 @@ export default {
 }
 .ext-config small {
   font-style: italic;
-}
-
-.toggle {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 33px;
-}
-
-.toggle input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: .2s;
-  transition-timing-function: ease-out;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 25px;
-  width: 25px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .2s;
-  transition-timing-function: ease-out;
-}
-
-input:checked + .slider {
-  background-color: mediumseagreen;
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
-}
-
-/* Rounded sliders */
-.slider.round {
-  border-radius: 32px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
 }
 </style>

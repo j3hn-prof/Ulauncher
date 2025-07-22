@@ -61,7 +61,7 @@ class ResultWidget(Gtk.EventBox):
         )
         item_container.pack_start(self.text_container, True, True, 0)
 
-        self.shortcut_label = Gtk.Label(justify=Gtk.Justification.RIGHT, width_request=44, margin_end=5)
+        self.shortcut_label = Gtk.Label(justify=Gtk.Justification.RIGHT, width_request=44)
         self.shortcut_label.get_style_context().add_class("item-shortcut")
         self.shortcut_label.get_style_context().add_class("item-text")
         item_container.pack_end(self.shortcut_label, False, True, 0)
@@ -73,7 +73,11 @@ class ResultWidget(Gtk.EventBox):
         self.title_box = Gtk.Box()
         self.title_box.get_style_context().add_class("item-name")
         self.title_box.get_style_context().add_class("item-text")
-        self.text_container.pack_start(self.title_box, False, True, 0)
+
+        # title_box should fill vertical space if there's no description
+        should_expand = not result.compact and not result.description
+
+        self.text_container.pack_start(self.title_box, should_expand, True, 0)
 
         item_container.set_property("margin-start", outer_margin_x)
         item_container.set_property("margin-end", outer_margin_x)
@@ -137,7 +141,7 @@ class ResultWidget(Gtk.EventBox):
         window = self.get_toplevel()
         window.select_result(self.index)  # type: ignore[attr-defined]
         alt = bool(event and event.button != 1)  # right click
-        window.results_nav.activate(self.query, alt=alt)  # type: ignore[attr-defined]
+        window.results_nav.activate(alt)  # type: ignore[attr-defined]
 
     def on_mouse_hover(self, _widget: Gtk.Widget, event: Gdk.EventCrossing) -> None:
         # event.time is 0 it means the mouse didn't move, but the window scrolled behind the mouse

@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlparse
 
 from gi.repository import Gio, GLib, Gtk
 
-from ulauncher.config import API_VERSION, VERSION, paths
+from ulauncher import api_version, paths, version
 from ulauncher.modes.extensions import extension_finder
 from ulauncher.modes.extensions.extension_controller import ExtensionController
 from ulauncher.modes.shortcuts.shortcuts_db import ShortcutsDb
@@ -87,9 +87,8 @@ class PreferencesServer:
         uri: str = scheme_request.get_uri()
         params = urlparse(uri)
         path = params.path.replace("null/", "/")
-        route_handler = routes.get(path)
 
-        if route_handler:
+        if route_handler := routes.get(path):
             # WebKit.URISchemeRequest is very primitive as a server:
             # * It can only read the URL (not the body of a post request)
             # * It can either send data with status 200 or an error message which cannot be retrieved in the client.
@@ -143,9 +142,9 @@ class PreferencesServer:
         export_settings["autostart_enabled"] = self.autostart_pref.is_enabled()
         export_settings["env"] = {
             "autostart_allowed": self.autostart_pref.can_start(),
-            "api_version": API_VERSION,
+            "api_version": api_version,
             "hotkey_supported": HotkeyController.is_supported(),
-            "version": VERSION,
+            "version": version,
             "is_x11": IS_X11,
         }
 

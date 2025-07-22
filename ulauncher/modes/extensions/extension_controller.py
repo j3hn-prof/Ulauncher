@@ -11,7 +11,8 @@ from shutil import copytree, rmtree
 from typing import Any, Iterator
 from weakref import WeakValueDictionary
 
-from ulauncher.config import get_options, paths
+from ulauncher import paths
+from ulauncher.cli import get_cli_args
 from ulauncher.modes.extensions import extension_finder
 from ulauncher.modes.extensions.extension_dependencies import (
     ExtensionDependencies,
@@ -34,6 +35,7 @@ from ulauncher.utils.json_utils import json_load
 class ExtensionState(JsonConf):
     id = ""
     url = ""
+    browser_url = ""
     updated_at = ""
     commit_hash = ""
     commit_time = ""
@@ -50,7 +52,6 @@ class ExtensionState(JsonConf):
 
 
 logger = logging.getLogger()
-verbose_logging: bool = get_options().verbose
 controller_cache: WeakValueDictionary[str, ExtensionController] = WeakValueDictionary()
 extension_runtimes: dict[str, ExtensionRuntime] = {}
 
@@ -75,12 +76,12 @@ class ExtensionController:
 
         if self.state.url:
             self.remote = ExtensionRemote(self.state.url)
+            self.state.browser_url = self.remote.browser_url or ""
 
     @classmethod
     def create(cls, ext_id: str, path: str | None = None) -> ExtensionController:
-        cached_controller = controller_cache.get(ext_id)
-        if cached_controller:
-            return cached_controller
+        if controller := controller_cache.get(ext_id):
+            return controller
         new_controller = cls(ext_id, path)
         controller_cache[ext_id] = new_controller
         return new_controller
@@ -95,6 +96,7 @@ class ExtensionController:
             controller_cache[remote.ext_id] = instance
         instance.remote = remote
         instance.state.url = url
+        instance.state.browser_url = remote.browser_url or ""
         return instance
 
     @classmethod
@@ -262,7 +264,7 @@ class ExtensionController:
             # backwards compatible v2 preferences format (with keywords added back)
             v2_prefs = {**triggers, **prefs}
             env = {
-                "VERBOSE": str(int(verbose_logging)),
+                "VERBOSE": str(int(get_cli_args().verbose)),
                 "PYTHONPATH": ":".join(x for x in [paths.APPLICATION, ext_deps.get_dependencies_path()] if x),
                 "EXTENSION_PREFERENCES": json.dumps(v2_prefs, separators=(",", ":")),
             }
@@ -280,8 +282,7 @@ class ExtensionController:
         return False
 
     async def stop(self) -> None:
-        runtime = extension_runtimes.pop(self.id, None)
-        if runtime:
+        if runtime := extension_runtimes.pop(self.id, None):
             await runtime.stop()
             self.is_running = False
 

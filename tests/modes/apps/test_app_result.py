@@ -33,8 +33,7 @@ class TestAppResult:
     def patch_desktop_app_info_get_all(self, mocker: Any) -> Any:
         def get_all_appinfo() -> Iterator[Gio.DesktopAppInfo]:
             for path in ["trueapp.desktop", "falseapp.desktop"]:
-                app_info = Gio.DesktopAppInfo.new(f"{ENTRIES_DIR}/{path}")
-                if app_info:
+                if app_info := Gio.DesktopAppInfo.new(f"{ENTRIES_DIR}/{path}"):
                     yield app_info
 
         return mocker.patch("ulauncher.modes.apps.app_result.Gio.DesktopAppInfo.get_all", new=get_all_appinfo)
@@ -68,7 +67,3 @@ class TestAppResult:
     def test_bump(self, app1: AppResult, app_starts: dict[str, int]) -> None:
         app1.bump_starts()
         assert app_starts.get("trueapp.desktop") == 766
-
-    def test_get_most_frequent(self) -> None:
-        assert len(AppResult.get_most_frequent()) == 2
-        assert AppResult.get_most_frequent()[0].name == "FalseApp - Full Name"

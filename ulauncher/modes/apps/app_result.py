@@ -6,7 +6,7 @@ from os.path import basename
 
 from gi.repository import Gio
 
-from ulauncher.config import paths
+from ulauncher import paths
 from ulauncher.internals.result import Result
 from ulauncher.utils.json_utils import json_load, json_save
 
@@ -48,16 +48,10 @@ class AppResult(Result):
         sorted_tuples = sorted(app_starts.items(), key=operator.itemgetter(1), reverse=True)
         return [*map(operator.itemgetter(0), sorted_tuples)]
 
-    @staticmethod
-    def get_most_frequent(limit: int = 5) -> list[AppResult]:
-        # TODO: rename to `get_most_recent` and update method to remove old apps
-        return list(filter(None, map(AppResult.from_id, AppResult.get_top_app_ids())))[:limit]
-
     def get_searchable_fields(self) -> list[tuple[str, float]]:
         frequency_weight = 1.0
         sorted_app_ids = AppResult.get_top_app_ids()
-        count = len(sorted_app_ids)
-        if count:
+        if count := len(sorted_app_ids):
             index = sorted_app_ids.index(self.app_id) if self.app_id in sorted_app_ids else count
             frequency_weight = 1.0 - (index / count * 0.1) + 0.05
 

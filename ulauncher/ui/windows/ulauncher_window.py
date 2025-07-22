@@ -6,7 +6,7 @@ from typing import Any, Sequence
 from gi.repository import Gdk, GLib, Gtk
 
 import ulauncher
-from ulauncher.config import paths
+from ulauncher import paths
 from ulauncher.internals.result import Result
 from ulauncher.modes.query_handler import QueryHandler
 from ulauncher.ui import layer_shell
@@ -29,6 +29,7 @@ class UlauncherWindow(Gtk.ApplicationWindow):
     query_handler = QueryHandler()
 
     def __init__(self, **kwargs: Any) -> None:  # noqa: PLR0915
+        logger.info("Opening Ulauncher window")
         super().__init__(
             decorated=False,
             deletable=False,
@@ -114,16 +115,18 @@ class UlauncherWindow(Gtk.ApplicationWindow):
         self.connect("button-release-event", lambda *_: self.on_mouse_up())
         self.input.connect("changed", lambda *_: self.on_input_changed())
         self.input.connect("key-press-event", self.on_input_key_press)
+        self.connect("draw", self.on_initial_draw)
+
         prefs_btn.connect("clicked", lambda *_: events.emit("app:show_preferences"))
 
         self.set_keep_above(True)
         # Try setting a transparent background
         screen = self.get_screen()
         visual = screen.get_rgba_visual()
-        composited = screen.is_composited()
+        is_composited = screen.is_composited()
         logger.debug("Screen RGBA visual: %s", visual)
-        logger.debug("Screen is composited: %s", composited)
-        shadow_size = 20 if composited else 0
+        logger.debug("Screen is composited: %s", is_composited)
+        shadow_size = 20 if is_composited else 0
         self.window_frame.set_properties(
             margin_top=shadow_size,
             margin_bottom=shadow_size,
@@ -148,23 +151,26 @@ class UlauncherWindow(Gtk.ApplicationWindow):
 
         if self.query_str:
             self.set_input(self.query_str)
-            self.input.select_region(0, -1)
         else:
             # this will trigger to show frequent apps if necessary
             self.show_results([])
 
-        GLib.idle_add(self.init_listeners)
-
-    def init_listeners(self) -> None:
+    def deferred_init(self) -> None:
         if self.query_str:
-            # force refresh the query handler triggers
-            self.query_handler = QueryHandler()
-            self.query_handler.parse(self.query_str)
-            self.query_handler.handle_change()
+            # select all text in the input field.
+            # used when user turns off "start with blank query" setting
+            self.input.select_region(0, -1)
+        self.query_handler.load_triggers()
+        self.query_handler.update(self.query_str)
 
     ######################################
     # GTK Signal Handlers
     ######################################
+
+    def on_initial_draw(self, *_: tuple[Any]) -> None:
+        logger.info("Window shown")
+        self.disconnect_by_func(self.on_initial_draw)
+        GLib.idle_add(self.deferred_init)
 
     def on_focus_out(self) -> None:
         if self.settings.close_on_focus_out and not self.is_dragging:
@@ -179,8 +185,7 @@ class UlauncherWindow(Gtk.ApplicationWindow):
         Triggered by user input
         """
         events.emit("app:set_query", self.input.get_text(), update_input=False)
-        self.query_handler.parse(self.query_str)
-        self.query_handler.handle_change()
+        self.query_handler.update(self.query_str)
 
     def on_input_key_press(self, entry_widget: Gtk.Entry, event: Gdk.EventKey) -> bool:  # noqa: PLR0911
         """
@@ -280,13 +285,14 @@ class UlauncherWindow(Gtk.ApplicationWindow):
             self.set_visual(visual)
 
     def position_window(self) -> None:
+        base_height = 100  # roughly the height of Ulauncher with no results
         monitor = get_monitor(self.settings.render_on_screen != "default-monitor")
         if monitor:
-            geo = monitor.get_geometry()
-            max_height = geo.height - (geo.height * 0.15) - 100  # 100 is roughly the height of the text input
+            monitor_size = monitor.get_geometry()
+            max_height = monitor_size.height * 0.85 - base_height
             window_width = self.settings.base_width
-            pos_x = int(geo.width * 0.5 - window_width * 0.5 + geo.x)
-            pos_y = int(geo.y + geo.height * 0.12)
+            pos_x = int(monitor_size.width * 0.5 - window_width * 0.5 + monitor_size.x)
+            pos_y = int(monitor_size.y + monitor_size.height * 0.12)
             self.set_property("width-request", window_width)
             self.scroll_container.set_property("max-content-height", max_height)
 
@@ -297,6 +303,7 @@ class UlauncherWindow(Gtk.ApplicationWindow):
 
     @events.on
     def close(self, save_query: bool = False) -> None:
+        logger.info("Closing Ulauncher window")
         if not save_query or self.settings.clear_previous_query:
             events.emit("app:set_query", "", update_input=False)
         if self.settings.grab_mouse_pointer:
@@ -335,9 +342,7 @@ class UlauncherWindow(Gtk.ApplicationWindow):
 
         limit = len(self.settings.get_jump_keys()) or 25
         if not self.input.get_text() and self.settings.max_recent_apps:
-            from ulauncher.modes.apps.app_result import AppResult
-
-            results = AppResult.get_most_frequent(self.settings.max_recent_apps)
+            results = self.query_handler.get_most_frequent_apps(self.settings.max_recent_apps)
 
         if results:
             from ulauncher.ui.result_widget import ResultWidget

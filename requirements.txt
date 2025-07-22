@@ -1,7 +1,9 @@
 build
 lefthook
-mypy
+mypy < 1.17.0
 pytest
 pytest-mock
 ruff >= 0.12.1
+Sphinx
+sphinx_rtd_theme
 typos
